@@ -1,0 +1,48 @@
+name: Publicar NubaLith NOC v1.4.2
+
+on:
+  push:
+    paths:
+      - ".github/workflows/publish-v1.4.2.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar y verificar artefacto
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error 'https://sdmntprbrazilsouth.oaiusercontent.com/files/00000000-e3cc-820e-b4b5-46d06c7c9cdf/raw?se=2026-11-12T13%3A28%3A59Z&sp=r&sv=2026-06-06&sr=b&scid=01a1cfe5-2014-744b-ba3d-309b0d2bd326&skoid=fbc53507-c13f-4907-b4dd-0e03c91f5ad8&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-11-12T10%3A45%3A24Z&ske=2026-11-13T10%3A45%3A24Z&sks=b&skv=2026-06-06&sig=MKgX9ERA/Pl40XsYyd%2BAQyQO3omjStHj9f%2BZ7aA/J5E%3D' -o workflow-artifact.zip
+          echo 'e5b202111e58d9ccf667ca3d67d5dbdf6b3103d540608df2c70261572d5c096c  workflow-artifact.zip' | sha256sum -c -
+          unzip -q workflow-artifact.zip -d release
+          echo '950a24087275e0bf137b1c976302a3274911a65b5178a28f4ab6639a8ab89c17  release/NubaLith-NOC-v1.4.2.exe' | sha256sum -c -
+          echo '180a2b23b452df9e205b8c3707745acc884c1ab80b739f39d0af97574e03b931  release/NubaLith-NOC-v1.4.2-windows-x64.zip' | sha256sum -c -
+          unzip -t release/NubaLith-NOC-v1.4.2-windows-x64.zip >/dev/null
+
+      - name: Crear publicación estable
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view v1.4.2 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "La versión v1.4.2 ya existe; no se reemplazarán sus archivos."
+            exit 1
+          fi
+          cat > release-notes.md <<'EOF'
+          ## NubaLith NOC 1.4.2
+
+          - Corrige el enlace entre la lectura OCR y el catálogo ACSA/NASA.
+          - Si un detalle devuelve UNKNOWN, vuelve a leer únicamente la cabecera ampliada.
+          - Reconoce nombres cortos catalogados como MS1, FS1, SS1, VS1 y KPI.
+          - Solo autoselecciona una coincidencia única de palabra completa.
+          - No confunde MS10 con MS1 y no decide si aparecen dos equipos.
+          - No modifica plantillas locales, comentarios NOC, Freshdesk, mantenimiento ni otros clientes.
+
+          Las versiones 1.4.1 y 1.4.0 continúan disponibles para recuperación.
+          EOF
+          gh release create v1.4.2             release/NubaLith-NOC-v1.4.2.exe             release/NubaLith-NOC-v1.4.2-windows-x64.zip             --repo "$GITHUB_REPOSITORY"             --title "NubaLith NOC v1.4.2"             --notes-file release-notes.md             --latest
